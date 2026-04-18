@@ -3,23 +3,23 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Browser Privacy Audit</title>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<title>SYS::RECON</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg: #080c10;
-  --surface: #0e1318;
-  --surface2: #141b22;
-  --border: #1e2a35;
-  --border2: #263444;
-  --green: #00e87a;
-  --cyan: #00c8f0;
-  --yellow: #f0c000;
-  --red: #ff4d6a;
-  --text: #cdd8e0;
-  --muted: #4a6070;
+  --bg: #020806;
+  --surface: #070f0a;
+  --surface2: #0a1510;
+  --border: #0f2a18;
+  --border2: #173d24;
+  --green: #00ff41;
+  --green2: #00c832;
+  --cyan: #00ffcc;
+  --yellow: #ffe600;
+  --red: #ff2244;
+  --text: #b8f0cc;
+  --muted: #2a5038;
   --mono: 'IBM Plex Mono', monospace;
-  --sans: 'IBM Plex Sans', sans-serif;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -27,161 +27,280 @@
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: var(--sans);
+  font-family: var(--mono);
   min-height: 100vh;
-  padding: 48px 20px 80px;
+  padding: 0 0 80px;
   position: relative;
+  overflow-x: hidden;
 }
 
-/* Scanline bg */
-body::before {
+/* Matrix canvas */
+#matrix-canvas {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.18;
+}
+
+/* CRT scanline overlay */
+body::after {
   content: '';
   position: fixed; inset: 0;
   background: repeating-linear-gradient(
     0deg,
     transparent,
-    transparent 2px,
-    rgba(0,232,122,0.012) 2px,
-    rgba(0,232,122,0.012) 4px
+    transparent 3px,
+    rgba(0,0,0,0.25) 3px,
+    rgba(0,0,0,0.25) 4px
   );
-  pointer-events: none; z-index: 0;
+  pointer-events: none;
+  z-index: 9999;
 }
 
-.wrap { max-width: 720px; margin: 0 auto; position: relative; z-index: 1; }
+/* Vignette */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.75) 100%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.wrap {
+  max-width: 760px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 2;
+  padding: 0 20px;
+}
+
+/* ── BOOT SCREEN ── */
+#boot-screen {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  font-family: var(--mono);
+}
+
+#boot-log {
+  font-size: 13px;
+  color: var(--green);
+  line-height: 1.9;
+  text-align: left;
+  width: min(500px, 90vw);
+}
+
+#boot-log .line {
+  opacity: 0;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+#boot-log .line.show { opacity: 1; }
+#boot-log .line.ok::before { content: '[  OK  ] '; color: var(--green2); }
+#boot-log .line.run::before { content: '[ RUN  ] '; color: var(--yellow); }
+#boot-log .line.sys::before { content: '[ SYS  ] '; color: var(--cyan); }
+#boot-log .line.err::before { content: '[ ERR  ] '; color: var(--red); }
+
+.boot-bar-wrap {
+  width: min(500px, 90vw);
+  margin-top: 20px;
+  height: 2px;
+  background: var(--border);
+  position: relative;
+  overflow: hidden;
+}
+
+.boot-bar-fill {
+  height: 100%;
+  background: var(--green);
+  width: 0%;
+  transition: width 0.1s linear;
+  box-shadow: 0 0 8px var(--green);
+}
 
 /* ── HEADER ── */
-.hdr { margin-bottom: 40px; }
+.hdr {
+  padding: 48px 0 32px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 32px;
+  opacity: 0;
+  animation: fadein 0.5s 0.1s ease both;
+}
 
-.tag {
-  font-family: var(--mono);
-  font-size: 10px;
-  letter-spacing: 0.15em;
-  color: var(--green);
-  background: rgba(0,232,122,0.08);
-  border: 1px solid rgba(0,232,122,0.25);
+.sys-tag {
+  font-size: 9px;
+  letter-spacing: 0.25em;
+  color: var(--muted);
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sys-tag::before {
+  content: '';
   display: inline-block;
-  padding: 3px 10px;
-  border-radius: 2px;
-  margin-bottom: 20px;
+  width: 6px;
+  height: 6px;
+  background: var(--green);
+  border-radius: 50%;
+  box-shadow: 0 0 8px var(--green);
+  animation: pulse-dot 2s infinite;
 }
 
 h1 {
-  font-family: var(--mono);
-  font-size: clamp(22px, 4.5vw, 34px);
-  font-weight: 600;
-  color: #fff;
-  line-height: 1.2;
-  margin-bottom: 14px;
+  font-size: clamp(26px, 5vw, 42px);
+  font-weight: 700;
+  color: var(--green);
+  text-shadow: 0 0 20px rgba(0,255,65,0.4), 0 0 40px rgba(0,255,65,0.15);
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  margin-bottom: 10px;
 }
 
-h1 em { color: var(--green); font-style: normal; }
-
-.intro {
-  font-size: 14px;
+.sub {
+  font-size: 11px;
   color: var(--muted);
-  line-height: 1.7;
-  max-width: 580px;
-  border-left: 2px solid var(--border2);
-  padding-left: 16px;
+  letter-spacing: 0.1em;
 }
 
 /* ── SECTION HEADER ── */
 .sec-hdr {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin: 32px 0 12px;
+  gap: 12px;
+  margin: 28px 0 14px;
 }
 
 .sec-hdr .line { flex: 1; height: 1px; background: var(--border); }
 
 .sec-title {
-  font-family: var(--mono);
-  font-size: 10px;
-  letter-spacing: 0.14em;
+  font-size: 9px;
+  letter-spacing: 0.2em;
   color: var(--muted);
   text-transform: uppercase;
   white-space: nowrap;
 }
 
-/* ── CARDS ── */
-.cards { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+/* ── DATA CARDS ── */
+.cards { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .cards.single { grid-template-columns: 1fr; }
 @media(max-width:520px) { .cards { grid-template-columns: 1fr; } }
 
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 16px 18px;
+  border-radius: 4px;
+  padding: 14px 16px;
   opacity: 0;
-  animation: rise 0.4s ease both;
+  animation: fadein 0.4s ease both;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 
-.card:hover { border-color: var(--border2); }
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  width: 2px; height: 100%;
+  background: var(--green);
+  opacity: 0;
+  transition: opacity 0.2s;
+  box-shadow: 0 0 8px var(--green);
+}
+
+.card:hover { border-color: var(--border2); box-shadow: 0 0 20px rgba(0,255,65,0.05); }
+.card:hover::before { opacity: 1; }
 
 .card-top {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .card-label {
-  font-family: var(--mono);
-  font-size: 10px;
-  letter-spacing: 0.1em;
+  font-size: 9px;
+  letter-spacing: 0.15em;
   color: var(--muted);
   text-transform: uppercase;
 }
 
 .risk {
-  font-family: var(--mono);
-  font-size: 9px;
-  padding: 2px 6px;
+  font-size: 8px;
+  padding: 1px 5px;
   border-radius: 2px;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.08em;
 }
-.risk.low  { background: rgba(0,232,122,0.1); color: var(--green); border: 1px solid rgba(0,232,122,0.2); }
-.risk.med  { background: rgba(240,192,0,0.1); color: var(--yellow); border: 1px solid rgba(240,192,0,0.2); }
-.risk.high { background: rgba(255,77,106,0.1); color: var(--red); border: 1px solid rgba(255,77,106,0.2); }
+.risk.low  { background: rgba(0,255,65,0.08); color: var(--green); border: 1px solid rgba(0,255,65,0.2); }
+.risk.med  { background: rgba(255,230,0,0.08); color: var(--yellow); border: 1px solid rgba(255,230,0,0.2); }
+.risk.high { background: rgba(255,34,68,0.08); color: var(--red); border: 1px solid rgba(255,34,68,0.2); }
 
 .card-value {
-  font-family: var(--mono);
   font-size: 13px;
   color: var(--text);
   word-break: break-all;
-  line-height: 1.55;
-  margin-bottom: 8px;
+  line-height: 1.5;
 }
 
-.card-value.big { font-size: 20px; color: var(--cyan); }
+.card-value.big { font-size: 22px; color: var(--green); text-shadow: 0 0 12px rgba(0,255,65,0.5); }
 .card-value.ok  { color: var(--green); }
-.card-value.warn { color: var(--yellow); }
-.card-value.loading { color: var(--muted); animation: blink 1.2s infinite; }
+.card-value.loading { color: var(--muted); animation: blink 1s infinite; }
 
-.card-edu {
-  font-size: 11px;
+/* ── FINGERPRINT GRID ── */
+.fp-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+@media(max-width:520px) { .fp-grid { grid-template-columns: 1fr 1fr; } }
+
+.fp-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 10px 12px;
+  opacity: 0;
+  animation: fadein 0.4s ease both;
+  transition: border-color 0.2s;
+}
+
+.fp-item:hover { border-color: var(--border2); }
+
+.fp-label {
+  font-size: 8px;
+  letter-spacing: 0.12em;
   color: var(--muted);
-  line-height: 1.6;
-  border-top: 1px solid var(--border);
-  padding-top: 8px;
-  margin-top: 4px;
+  text-transform: uppercase;
+  margin-bottom: 3px;
+}
+
+.fp-val {
+  font-size: 12px;
+  color: var(--text);
+  word-break: break-all;
 }
 
 /* ── PERMISSION CARDS ── */
 .perm-card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 18px 20px;
-  margin-bottom: 10px;
+  border-radius: 4px;
+  padding: 16px 18px;
+  margin-bottom: 8px;
   opacity: 0;
-  animation: rise 0.4s ease both;
+  animation: fadein 0.4s ease both;
+  transition: border-color 0.2s;
 }
 
-.perm-card.granted { border-color: rgba(0,232,122,0.35); }
-.perm-card.denied  { border-color: rgba(255,77,106,0.3); }
+.perm-card.granted { border-color: rgba(0,255,65,0.3); box-shadow: 0 0 16px rgba(0,255,65,0.04); }
+.perm-card.denied  { border-color: rgba(255,34,68,0.25); }
 
 .perm-header {
   display: flex;
@@ -191,171 +310,276 @@ h1 em { color: var(--green); font-style: normal; }
 }
 
 .perm-name {
-  font-family: var(--mono);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
-  color: #fff;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  color: var(--text);
+  letter-spacing: 0.05em;
 }
-
-.perm-icon { font-size: 16px; }
 
 .perm-status {
-  font-family: var(--mono);
-  font-size: 10px;
-  padding: 2px 8px;
+  font-size: 9px;
+  padding: 2px 7px;
   border-radius: 2px;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.1em;
 }
 .perm-status.idle    { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
-.perm-status.waiting { background: rgba(240,192,0,0.1); color: var(--yellow); border: 1px solid rgba(240,192,0,0.25); }
-.perm-status.granted { background: rgba(0,232,122,0.1); color: var(--green); border: 1px solid rgba(0,232,122,0.25); }
-.perm-status.denied  { background: rgba(255,77,106,0.08); color: var(--red); border: 1px solid rgba(255,77,106,0.2); }
-
-.perm-desc {
-  font-size: 12px;
-  color: var(--muted);
-  line-height: 1.65;
-  margin-bottom: 12px;
-}
-
-.perm-desc strong { color: var(--text); font-weight: 500; }
+.perm-status.waiting { background: rgba(255,230,0,0.08); color: var(--yellow); border: 1px solid rgba(255,230,0,0.2); animation: blink 0.8s infinite; }
+.perm-status.granted { background: rgba(0,255,65,0.08); color: var(--green); border: 1px solid rgba(0,255,65,0.2); }
+.perm-status.denied  { background: rgba(255,34,68,0.06); color: var(--red); border: 1px solid rgba(255,34,68,0.2); }
 
 .perm-result {
-  font-family: var(--mono);
   font-size: 12px;
   color: var(--green);
-  background: rgba(0,232,122,0.05);
-  border: 1px solid rgba(0,232,122,0.15);
-  border-radius: 4px;
+  background: rgba(0,255,65,0.04);
+  border: 1px solid rgba(0,255,65,0.12);
+  border-radius: 3px;
   padding: 10px 12px;
   margin-bottom: 10px;
-  line-height: 1.7;
+  line-height: 1.75;
   display: none;
   word-break: break-all;
+  position: relative;
+}
+
+.perm-result::before {
+  content: '> ';
+  color: var(--muted);
 }
 
 .perm-result.denied-result {
   color: var(--red);
-  background: rgba(255,77,106,0.04);
-  border-color: rgba(255,77,106,0.15);
+  background: rgba(255,34,68,0.04);
+  border-color: rgba(255,34,68,0.12);
 }
 
 .btn {
   font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 0.06em;
-  padding: 8px 18px;
-  border-radius: 4px;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  padding: 7px 16px;
+  border-radius: 3px;
   cursor: pointer;
   border: 1px solid var(--green);
   background: transparent;
   color: var(--green);
-  transition: background 0.15s, opacity 0.15s;
-}
-.btn:hover:not(:disabled) { background: rgba(0,232,122,0.1); }
-.btn:disabled { opacity: 0.35; cursor: default; }
-
-/* ── FINGERPRINT ── */
-.fp-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
-@media(max-width:520px) { .fp-grid { grid-template-columns: 1fr 1fr; } }
-
-.fp-item {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 12px 14px;
-  opacity: 0;
-  animation: rise 0.4s ease both;
-}
-
-.fp-label {
-  font-family: var(--mono);
-  font-size: 9px;
-  letter-spacing: 0.1em;
-  color: var(--muted);
+  transition: background 0.15s, box-shadow 0.15s;
   text-transform: uppercase;
-  margin-bottom: 4px;
+}
+.btn:hover:not(:disabled) {
+  background: rgba(0,255,65,0.08);
+  box-shadow: 0 0 12px rgba(0,255,65,0.2);
+}
+.btn:disabled { opacity: 0.25; cursor: default; }
+
+/* ── GLITCH HEADER ── */
+@keyframes glitch1 {
+  0%, 100% { clip-path: inset(0 0 95% 0); transform: translateX(-3px); }
+  20% { clip-path: inset(30% 0 50% 0); transform: translateX(3px); }
+  40% { clip-path: inset(70% 0 10% 0); transform: translateX(-3px); }
+  60% { clip-path: inset(50% 0 30% 0); transform: translateX(2px); }
+  80% { clip-path: inset(10% 0 80% 0); transform: translateX(-2px); }
+}
+@keyframes glitch2 {
+  0%, 100% { clip-path: inset(80% 0 5% 0); transform: translateX(3px); }
+  25% { clip-path: inset(10% 0 70% 0); transform: translateX(-4px); }
+  50% { clip-path: inset(40% 0 40% 0); transform: translateX(4px); }
+  75% { clip-path: inset(60% 0 20% 0); transform: translateX(-3px); }
 }
 
-.fp-val {
-  font-family: var(--mono);
-  font-size: 12px;
-  color: var(--text);
-  word-break: break-all;
+.glitch-wrap { position: relative; display: inline-block; }
+
+.glitch-wrap::before,
+.glitch-wrap::after {
+  content: attr(data-text);
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  font-size: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
+  line-height: inherit;
 }
 
-/* ── SUMMARY BAR ── */
+.glitch-wrap::before {
+  color: var(--cyan);
+  animation: glitch1 4s infinite;
+  animation-delay: 1s;
+  text-shadow: none;
+}
+
+.glitch-wrap::after {
+  color: var(--red);
+  animation: glitch2 4s infinite;
+  animation-delay: 1.5s;
+  text-shadow: none;
+}
+
+/* ── SUMMARY ── */
 .summary {
   background: var(--surface2);
   border: 1px solid var(--border2);
-  border-radius: 8px;
-  padding: 20px 22px;
-  margin-top: 32px;
+  border-radius: 4px;
+  padding: 18px 20px;
+  margin-top: 28px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
   opacity: 0;
-  animation: rise 0.4s 1s ease both;
+  animation: fadein 0.4s 0.8s ease both;
 }
 
 .summary-title {
-  font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 0.1em;
+  font-size: 9px;
+  letter-spacing: 0.2em;
   color: var(--muted);
   text-transform: uppercase;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
 }
 
 .summary-row {
   display: flex;
   justify-content: space-between;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .summary-row span:first-child { color: var(--muted); }
-.summary-row span:last-child  { font-family: var(--mono); color: var(--text); }
+.summary-row span:last-child  { color: var(--text); }
 
 /* ── FOOTER ── */
 .footer {
   text-align: center;
-  font-family: var(--mono);
-  font-size: 11px;
+  font-size: 10px;
   color: var(--muted);
-  margin-top: 40px;
+  margin-top: 36px;
+  letter-spacing: 0.15em;
   opacity: 0;
-  animation: rise 0.4s 1.1s ease both;
+  animation: fadein 0.4s 0.9s ease both;
 }
 
 /* ── ANIMATIONS ── */
-@keyframes rise {
-  from { opacity: 0; transform: translateY(10px); }
+@keyframes fadein {
+  from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 @keyframes blink {
-  0%,100% { opacity: 1; } 50% { opacity: 0.25; }
+  0%,100% { opacity: 1; } 50% { opacity: 0.2; }
+}
+@keyframes pulse-dot {
+  0%,100% { box-shadow: 0 0 4px var(--green); }
+  50%     { box-shadow: 0 0 14px var(--green); }
+}
+@keyframes typewriter {
+  from { width: 0; } to { width: 100%; }
+}
+
+/* ── TICKER ── */
+.ticker-wrap {
+  overflow: hidden;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  height: 28px;
+  display: flex;
+  align-items: center;
+  margin-bottom: 0;
+  background: var(--surface);
+}
+
+.ticker-label {
+  font-size: 9px;
+  letter-spacing: 0.15em;
+  color: var(--green);
+  background: rgba(0,255,65,0.08);
+  padding: 0 12px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  border-right: 1px solid var(--border);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.ticker-inner {
+  display: flex;
+  animation: ticker 30s linear infinite;
+  white-space: nowrap;
+}
+
+.ticker-item {
+  font-size: 10px;
+  color: var(--muted);
+  padding: 0 24px;
+  letter-spacing: 0.08em;
+}
+
+.ticker-item span { color: var(--green); }
+
+@keyframes ticker {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
 }
 </style>
 </head>
 <body>
+
+<!-- MATRIX RAIN -->
+<canvas id="matrix-canvas"></canvas>
+
+<!-- BOOT SCREEN -->
+<div id="boot-screen">
+  <div id="boot-log">
+    <div class="line sys" id="bl0">Initializing recon subsystem v3.1.4...</div>
+    <div class="line run" id="bl1">Loading passive data modules</div>
+    <div class="line ok"  id="bl2">Network interface detected</div>
+    <div class="line run" id="bl3">Probing browser fingerprint vectors</div>
+    <div class="line ok"  id="bl4">Canvas entropy module loaded</div>
+    <div class="line ok"  id="bl5">IP geolocation module loaded</div>
+    <div class="line run" id="bl6">Requesting external IP resolution</div>
+    <div class="line sys" id="bl7">Mounting permission probe interface</div>
+    <div class="line ok"  id="bl8">All systems nominal — access granted</div>
+  </div>
+  <div class="boot-bar-wrap">
+    <div class="boot-bar-fill" id="boot-bar"></div>
+  </div>
+</div>
+
 <div class="wrap">
 
-  <!-- HEADER -->
-  <div class="hdr" style="animation: rise 0.5s ease both;">
-    <div class="tag">BROWSER PRIVACY AUDIT</div>
-    <h1>What does the internet<br>already know about <em>you?</em></h1>
-    <p class="intro">
-      Every website you visit receives some of this data automatically — no permissions needed.
-      This page collects nothing and sends nothing to any server. Everything runs locally in your browser.
-    </p>
+  <!-- TICKER -->
+  <div class="ticker-wrap">
+    <div class="ticker-label">LIVE FEED</div>
+    <div class="ticker-inner" id="ticker-inner">
+      <div class="ticker-item">IP <span id="tick-ip">resolving...</span></div>
+      <div class="ticker-item">TZ <span id="tick-tz">—</span></div>
+      <div class="ticker-item">PLATFORM <span id="tick-plat">—</span></div>
+      <div class="ticker-item">SCREEN <span id="tick-screen">—</span></div>
+      <div class="ticker-item">THREADS <span id="tick-cpu">—</span></div>
+      <div class="ticker-item">LANG <span id="tick-lang">—</span></div>
+      <div class="ticker-item">CANVAS <span id="tick-canvas">—</span></div>
+      <div class="ticker-item">STATUS <span style="color:var(--green)">ONLINE</span></div>
+
+      <div class="ticker-item">IP <span id="tick-ip2">resolving...</span></div>
+      <div class="ticker-item">TZ <span id="tick-tz2">—</span></div>
+      <div class="ticker-item">PLATFORM <span id="tick-plat2">—</span></div>
+      <div class="ticker-item">SCREEN <span id="tick-screen2">—</span></div>
+      <div class="ticker-item">THREADS <span id="tick-cpu2">—</span></div>
+      <div class="ticker-item">LANG <span id="tick-lang2">—</span></div>
+      <div class="ticker-item">CANVAS <span id="tick-canvas2">—</span></div>
+      <div class="ticker-item">STATUS <span style="color:var(--green)">ONLINE</span></div>
+    </div>
   </div>
 
-  <!-- SECTION: PASSIVE DATA -->
+  <!-- HEADER -->
+  <div class="hdr">
+    <div class="sys-tag">SYS::RECON &nbsp;·&nbsp; SESSION ACTIVE &nbsp;·&nbsp; <span id="live-time">00:00:00</span></div>
+    <h1><span class="glitch-wrap" data-text="TARGET_ACQUIRED">TARGET_ACQUIRED</span></h1>
+    <div class="sub">BROWSER INTELLIGENCE REPORT &nbsp;//&nbsp; PASSIVE + ACTIVE VECTORS</div>
+  </div>
+
+  <!-- PASSIVE -->
   <div class="sec-hdr">
-    <div class="sec-title">Passive data — no permission needed</div>
+    <div class="sec-title">// passive — no permission</div>
     <div class="line"></div>
   </div>
 
@@ -363,208 +587,230 @@ h1 em { color: var(--green); font-style: normal; }
     <div class="card" style="animation-delay:0.05s">
       <div class="card-top">
         <div class="card-label">IP Address</div>
-        <span class="risk high">HIGH RISK</span>
+        <span class="risk high">CRITICAL</span>
       </div>
-      <div class="card-value big loading" id="val-ip">loading…</div>
-      <div class="card-edu">
-        Your IP is sent with <em>every</em> request you make on the internet. Sites use it to geo-locate you,
-        block or throttle users, cross-reference ad profiles, and log visits. A VPN replaces it with the VPN server's IP.
-      </div>
+      <div class="card-value big loading" id="val-ip">resolving...</div>
     </div>
   </div>
 
-  <div class="cards" style="margin-top:10px">
-    <div class="card" style="animation-delay:0.1s">
+  <div class="cards" style="margin-top:8px">
+    <div class="card" style="animation-delay:0.08s">
       <div class="card-top">
-        <div class="card-label">IP Location</div>
-        <span class="risk med">MEDIUM</span>
+        <div class="card-label">Location</div>
+        <span class="risk med">HIGH</span>
       </div>
-      <div class="card-value loading" id="val-loc">loading…</div>
-      <div class="card-edu">Derived from your IP. Accurate to city level. Not GPS — but close enough for ad targeting and geo-blocking.</div>
+      <div class="card-value loading" id="val-loc">resolving...</div>
     </div>
-    <div class="card" style="animation-delay:0.15s">
+    <div class="card" style="animation-delay:0.11s">
       <div class="card-top">
         <div class="card-label">ISP / Org</div>
-        <span class="risk med">MEDIUM</span>
+        <span class="risk med">MED</span>
       </div>
-      <div class="card-value loading" id="val-isp">loading…</div>
-      <div class="card-edu">Your internet provider, or corporate/VPN org name. Reveals if you're on a residential, datacenter, or VPN IP.</div>
+      <div class="card-value loading" id="val-isp">resolving...</div>
     </div>
   </div>
 
-  <div class="cards" style="margin-top:10px">
-    <div class="card" style="animation-delay:0.2s">
+  <div class="cards" style="margin-top:8px">
+    <div class="card" style="animation-delay:0.14s">
       <div class="card-top">
         <div class="card-label">Timezone</div>
         <span class="risk low">LOW</span>
       </div>
       <div class="card-value" id="val-tz">—</div>
-      <div class="card-edu">Exposed by your OS clock. Used alongside IP to verify (or contradict) your claimed location.</div>
     </div>
-    <div class="card" style="animation-delay:0.25s">
+    <div class="card" style="animation-delay:0.17s">
       <div class="card-top">
-        <div class="card-label">Currency (from IP)</div>
+        <div class="card-label">Currency</div>
         <span class="risk low">LOW</span>
       </div>
       <div class="card-value" id="val-cur">—</div>
-      <div class="card-edu">Inferred from country via IP. Used by e-commerce to show local prices — or charge different amounts.</div>
     </div>
   </div>
 
-  <!-- SECTION: BROWSER FINGERPRINT -->
+  <!-- FINGERPRINT -->
   <div class="sec-hdr">
-    <div class="sec-title">Browser fingerprint — passive, no permission</div>
+    <div class="sec-title">// browser fingerprint</div>
     <div class="line"></div>
   </div>
-
-  <p style="font-size:12px; color:var(--muted); margin-bottom:14px; line-height:1.65;">
-    These values don't identify you alone — but combined, they form a fingerprint shared by very few (sometimes zero) other users.
-    Advertisers use this to track you <strong style="color:var(--text)">across sites even without cookies</strong>.
-  </p>
 
   <div class="fp-grid">
-    <div class="fp-item" style="animation-delay:0.1s"><div class="fp-label">Screen</div><div class="fp-val" id="fp-screen">—</div></div>
-    <div class="fp-item" style="animation-delay:0.15s"><div class="fp-label">Color Depth</div><div class="fp-val" id="fp-color">—</div></div>
-    <div class="fp-item" style="animation-delay:0.2s"><div class="fp-label">Pixel Ratio</div><div class="fp-val" id="fp-dpr">—</div></div>
-    <div class="fp-item" style="animation-delay:0.25s"><div class="fp-label">Language</div><div class="fp-val" id="fp-lang">—</div></div>
-    <div class="fp-item" style="animation-delay:0.3s"><div class="fp-label">Platform</div><div class="fp-val" id="fp-plat">—</div></div>
-    <div class="fp-item" style="animation-delay:0.35s"><div class="fp-label">CPU Threads</div><div class="fp-val" id="fp-cpu">—</div></div>
-    <div class="fp-item" style="animation-delay:0.4s"><div class="fp-label">Memory (GB)</div><div class="fp-val" id="fp-ram">—</div></div>
-    <div class="fp-item" style="animation-delay:0.45s"><div class="fp-label">Touch Points</div><div class="fp-val" id="fp-touch">—</div></div>
-    <div class="fp-item" style="animation-delay:0.5s"><div class="fp-label">Do Not Track</div><div class="fp-val" id="fp-dnt">—</div></div>
-    <div class="fp-item" style="animation-delay:0.55s"><div class="fp-label">Cookies Enabled</div><div class="fp-val" id="fp-cookies">—</div></div>
-    <div class="fp-item" style="animation-delay:0.6s"><div class="fp-label">PDF Viewer</div><div class="fp-val" id="fp-pdf">—</div></div>
-    <div class="fp-item" style="animation-delay:0.65s"><div class="fp-label">Canvas Hash</div><div class="fp-val" id="fp-canvas">—</div></div>
+    <div class="fp-item" style="animation-delay:0.08s"><div class="fp-label">Screen</div><div class="fp-val" id="fp-screen">—</div></div>
+    <div class="fp-item" style="animation-delay:0.11s"><div class="fp-label">Color Depth</div><div class="fp-val" id="fp-color">—</div></div>
+    <div class="fp-item" style="animation-delay:0.14s"><div class="fp-label">Pixel Ratio</div><div class="fp-val" id="fp-dpr">—</div></div>
+    <div class="fp-item" style="animation-delay:0.17s"><div class="fp-label">Language</div><div class="fp-val" id="fp-lang">—</div></div>
+    <div class="fp-item" style="animation-delay:0.2s"><div class="fp-label">Platform</div><div class="fp-val" id="fp-plat">—</div></div>
+    <div class="fp-item" style="animation-delay:0.23s"><div class="fp-label">CPU Threads</div><div class="fp-val" id="fp-cpu">—</div></div>
+    <div class="fp-item" style="animation-delay:0.26s"><div class="fp-label">Memory</div><div class="fp-val" id="fp-ram">—</div></div>
+    <div class="fp-item" style="animation-delay:0.29s"><div class="fp-label">Touch Points</div><div class="fp-val" id="fp-touch">—</div></div>
+    <div class="fp-item" style="animation-delay:0.32s"><div class="fp-label">Do Not Track</div><div class="fp-val" id="fp-dnt">—</div></div>
+    <div class="fp-item" style="animation-delay:0.35s"><div class="fp-label">Cookies</div><div class="fp-val" id="fp-cookies">—</div></div>
+    <div class="fp-item" style="animation-delay:0.38s"><div class="fp-label">PDF Viewer</div><div class="fp-val" id="fp-pdf">—</div></div>
+    <div class="fp-item" style="animation-delay:0.41s"><div class="fp-label">Canvas Hash</div><div class="fp-val" id="fp-canvas">—</div></div>
   </div>
 
-  <!-- SECTION: USER AGENT -->
+  <!-- USER AGENT -->
   <div class="sec-hdr">
-    <div class="sec-title">User agent string</div>
+    <div class="sec-title">// user agent</div>
     <div class="line"></div>
   </div>
 
-  <div class="card" style="animation-delay:0.3s">
+  <div class="card" style="animation-delay:0.2s">
     <div class="card-top">
       <div class="card-label">Browser / OS / Engine</div>
-      <span class="risk med">MEDIUM</span>
+      <span class="risk med">MED</span>
     </div>
-    <div class="card-value" id="val-ua" style="font-size:11px; line-height:1.75;">—</div>
-    <div class="card-edu">
-      Sent with every HTTP request. Reveals your browser name, version, OS, and rendering engine.
-      Sites use it to serve optimized content — but also to fingerprint and profile you.
-    </div>
+    <div class="card-value" id="val-ua" style="font-size:11px; line-height:1.75; color:var(--muted);">—</div>
   </div>
 
-  <!-- SECTION: PERMISSION-GATED -->
-  <div class="sec-hdr" style="margin-top:36px;">
-    <div class="sec-title">Permission-gated data — you must allow these</div>
+  <!-- PERMISSION-GATED -->
+  <div class="sec-hdr" style="margin-top:28px;">
+    <div class="sec-title">// permission-gated vectors</div>
     <div class="line"></div>
   </div>
 
-  <p style="font-size:12px; color:var(--muted); margin-bottom:16px; line-height:1.65;">
-    The data below requires your explicit browser permission. Click each button to see what a site would receive if you approved.
-    <strong style="color:var(--text)">Many apps request these and store them permanently.</strong>
-  </p>
-
   <!-- GPS -->
-  <div class="perm-card" id="pc-gps" style="animation-delay:0.1s">
+  <div class="perm-card" id="pc-gps" style="animation-delay:0.08s">
     <div class="perm-header">
-      <div class="perm-name"><span class="perm-icon">📍</span> Precise GPS Location</div>
+      <div class="perm-name">[ GPS ] PRECISE LOCATION</div>
       <span class="perm-status idle" id="ps-gps">IDLE</span>
     </div>
-    <p class="perm-desc">
-      <strong>What sites get:</strong> Latitude/longitude accurate to meters, altitude if available, speed, heading, and accuracy radius.
-      Most dangerous of all permissions — combines with your IP location to confirm your real address.
-      Weather apps, maps, and many ad networks request this.
-    </p>
     <div class="perm-result" id="pr-gps"></div>
-    <button class="btn" id="btn-gps" onclick="reqGPS()">Request GPS permission</button>
+    <button class="btn" id="btn-gps" onclick="reqGPS()">PROBE</button>
   </div>
 
   <!-- Camera / Mic -->
-  <div class="perm-card" id="pc-cam" style="animation-delay:0.2s">
+  <div class="perm-card" id="pc-cam" style="animation-delay:0.14s">
     <div class="perm-header">
-      <div class="perm-name"><span class="perm-icon">🎙️</span> Camera & Microphone</div>
+      <div class="perm-name">[ CAM/MIC ] DEVICE ENUMERATE</div>
       <span class="perm-status idle" id="ps-cam">IDLE</span>
     </div>
-    <p class="perm-desc">
-      <strong>What sites get:</strong> A list of all your camera and microphone device names and IDs —
-      without actually capturing any audio or video. Device names can contain make/model info
-      useful for fingerprinting. Video call sites (Zoom, Meet, etc.) always request this.
-    </p>
     <div class="perm-result" id="pr-cam"></div>
-    <button class="btn" id="btn-cam" onclick="reqCamera()">Request camera/mic permission</button>
+    <button class="btn" id="btn-cam" onclick="reqCamera()">PROBE</button>
   </div>
 
   <!-- Battery -->
-  <div class="perm-card" id="pc-bat" style="animation-delay:0.3s">
+  <div class="perm-card" id="pc-bat" style="animation-delay:0.2s">
     <div class="perm-header">
-      <div class="perm-name"><span class="perm-icon">🔋</span> Battery Status</div>
+      <div class="perm-name">[ BATT ] POWER STATUS</div>
       <span class="perm-status idle" id="ps-bat">IDLE</span>
     </div>
-    <p class="perm-desc">
-      <strong>What sites get:</strong> Battery level (0–100%), charging state, time to charge/discharge.
-      Used in 2015 to track users across sessions — battery level changes slowly and predictably,
-      making it a reliable fingerprint signal. Now restricted in most browsers.
-    </p>
     <div class="perm-result" id="pr-bat"></div>
-    <button class="btn" id="btn-bat" onclick="reqBattery()">Check battery API</button>
+    <button class="btn" id="btn-bat" onclick="reqBattery()">PROBE</button>
   </div>
 
   <!-- Network -->
-  <div class="perm-card" id="pc-net" style="animation-delay:0.4s">
+  <div class="perm-card" id="pc-net" style="animation-delay:0.26s">
     <div class="perm-header">
-      <div class="perm-name"><span class="perm-icon">📶</span> Network / Connection Info</div>
+      <div class="perm-name">[ NET ] CONNECTION PROFILE</div>
       <span class="perm-status idle" id="ps-net">IDLE</span>
     </div>
-    <p class="perm-desc">
-      <strong>What sites get:</strong> Connection type (wifi, cellular, ethernet), effective speed (4g/3g/2g/slow-2g),
-      estimated downlink bandwidth, and round-trip time. Used by streaming sites to adapt quality —
-      also a fingerprinting vector.
-    </p>
     <div class="perm-result" id="pr-net"></div>
-    <button class="btn" id="btn-net" onclick="reqNetwork()">Check network API</button>
+    <button class="btn" id="btn-net" onclick="reqNetwork()">PROBE</button>
   </div>
 
   <!-- Clipboard -->
-  <div class="perm-card" id="pc-clip" style="animation-delay:0.5s">
+  <div class="perm-card" id="pc-clip" style="animation-delay:0.32s">
     <div class="perm-header">
-      <div class="perm-name"><span class="perm-icon">📋</span> Clipboard Read</div>
+      <div class="perm-name">[ CLIP ] CLIPBOARD READ</div>
       <span class="perm-status idle" id="ps-clip">IDLE</span>
     </div>
-    <p class="perm-desc">
-      <strong>What sites get:</strong> The full text content of your clipboard — whatever you last copied.
-      Could be passwords, addresses, sensitive messages, crypto keys. Requires explicit permission
-      in modern browsers, but some older sites/extensions can read it silently.
-    </p>
     <div class="perm-result" id="pr-clip"></div>
-    <button class="btn" id="btn-clip" onclick="reqClipboard()">Request clipboard read</button>
+    <button class="btn" id="btn-clip" onclick="reqClipboard()">PROBE</button>
   </div>
 
   <!-- SUMMARY -->
   <div class="summary">
-    <div class="summary-title">Session summary</div>
-    <div class="summary-row"><span>Data sent to this server</span><span style="color:var(--green)">None</span></div>
-    <div class="summary-row"><span>Cookies set</span><span style="color:var(--green)">None</span></div>
-    <div class="summary-row"><span>Passive fingerprint fields collected</span><span id="sum-fp">—</span></div>
-    <div class="summary-row"><span>Permissions granted this session</span><span id="sum-perm">0</span></div>
-    <div class="summary-row"><span>Uniqueness estimate</span><span id="sum-unique" style="color:var(--yellow)">calculating…</span></div>
+    <div class="summary-title">// recon summary</div>
+    <div class="summary-row"><span>Passive vectors collected</span><span id="sum-fp">—</span></div>
+    <div class="summary-row"><span>Permissions probed</span><span id="sum-perm">0</span></div>
+    <div class="summary-row"><span>Uniqueness estimate</span><span id="sum-unique" style="color:var(--yellow)">calculating...</span></div>
+    <div class="summary-row"><span>Session fingerprint</span><span id="sum-fp-hash" style="color:var(--cyan)">—</span></div>
   </div>
 
-  <div class="footer">
-    // no server · no cookies · no storage · educational use only //
-  </div>
+  <div class="footer">// SYS::RECON &nbsp;·&nbsp; LOCAL EXECUTION ONLY &nbsp;·&nbsp; NO DATA TRANSMITTED //</div>
 
 </div>
 
 <script>
-// ── PASSIVE DATA ──
+// ── MATRIX RAIN ──
+(function() {
+  const canvas = document.getElementById('matrix-canvas');
+  const ctx = canvas.getContext('2d');
+  let W, H, cols, drops;
 
-document.getElementById('val-tz').textContent = Intl.DateTimeFormat().resolvedOptions().timeZone || '—';
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%^&*()_+-=[]{}|;<>?,./\\アイウエオカキクケコサシスセソタチツテトナニヌネノ';
+
+  function resize() {
+    W = canvas.width = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+    const fontSize = 14;
+    cols = Math.floor(W / fontSize);
+    drops = Array(cols).fill(1);
+  }
+
+  window.addEventListener('resize', resize);
+  resize();
+
+  function draw() {
+    ctx.fillStyle = 'rgba(2,8,6,0.05)';
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#00ff41';
+    ctx.font = '14px IBM Plex Mono, monospace';
+    for (let i = 0; i < cols; i++) {
+      const c = chars[Math.floor(Math.random() * chars.length)];
+      ctx.fillStyle = Math.random() > 0.95 ? '#ffffff' : '#00ff41';
+      ctx.globalAlpha = Math.random() * 0.5 + 0.2;
+      ctx.fillText(c, i * 14, drops[i] * 14);
+      ctx.globalAlpha = 1;
+      if (drops[i] * 14 > H && Math.random() > 0.975) drops[i] = 0;
+      drops[i]++;
+    }
+  }
+
+  setInterval(draw, 40);
+})();
+
+// ── BOOT SEQUENCE ──
+(function() {
+  const lines = document.querySelectorAll('#boot-log .line');
+  const bar = document.getElementById('boot-bar');
+  let i = 0;
+
+  function showNext() {
+    if (i < lines.length) {
+      lines[i].classList.add('show');
+      bar.style.width = ((i + 1) / lines.length * 100) + '%';
+      i++;
+      setTimeout(showNext, 140 + Math.random() * 180);
+    } else {
+      setTimeout(() => {
+        const bs = document.getElementById('boot-screen');
+        bs.style.transition = 'opacity 0.6s';
+        bs.style.opacity = '0';
+        setTimeout(() => bs.style.display = 'none', 600);
+      }, 400);
+    }
+  }
+
+  setTimeout(showNext, 200);
+})();
+
+// ── LIVE CLOCK ──
+function updateClock() {
+  const now = new Date();
+  const t = [now.getHours(), now.getMinutes(), now.getSeconds()]
+    .map(n => String(n).padStart(2,'0')).join(':');
+  document.getElementById('live-time').textContent = t;
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ── PASSIVE DATA ──
+const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '—';
+document.getElementById('val-tz').textContent = tz;
 document.getElementById('val-ua').textContent = navigator.userAgent;
 
-// Fingerprint fields
-document.getElementById('fp-screen').textContent   = `${screen.width}×${screen.height}`;
+document.getElementById('fp-screen').textContent   = `${screen.width}x${screen.height}`;
 document.getElementById('fp-color').textContent    = `${screen.colorDepth}-bit`;
 document.getElementById('fp-dpr').textContent      = window.devicePixelRatio || '1';
 document.getElementById('fp-lang').textContent     = navigator.language || '—';
@@ -572,52 +818,68 @@ document.getElementById('fp-plat').textContent     = navigator.platform || '—'
 document.getElementById('fp-cpu').textContent      = navigator.hardwareConcurrency || '—';
 document.getElementById('fp-ram').textContent      = navigator.deviceMemory ? `${navigator.deviceMemory} GB` : 'hidden';
 document.getElementById('fp-touch').textContent    = navigator.maxTouchPoints ?? '0';
-document.getElementById('fp-dnt').textContent      = navigator.doNotTrack === '1' ? 'enabled' : 'off';
+document.getElementById('fp-dnt').textContent      = navigator.doNotTrack === '1' ? 'on' : 'off';
 document.getElementById('fp-cookies').textContent  = navigator.cookieEnabled ? 'yes' : 'no';
 document.getElementById('fp-pdf').textContent      = navigator.pdfViewerEnabled ? 'yes' : 'no';
 
-// Canvas fingerprint
+let canvasHashStr = '—';
 try {
   const cv = document.createElement('canvas');
-  const ctx = cv.getContext('2d');
-  ctx.textBaseline = 'top';
-  ctx.font = '14px Arial';
-  ctx.fillStyle = '#f60';
-  ctx.fillRect(125, 1, 62, 20);
-  ctx.fillStyle = '#069';
-  ctx.fillText('Browser', 2, 2);
-  ctx.fillStyle = 'rgba(102,204,0,0.7)';
-  ctx.fillText('Canvas fp', 4, 17);
+  const cx = cv.getContext('2d');
+  cx.textBaseline = 'top';
+  cx.font = '14px Arial';
+  cx.fillStyle = '#f60';
+  cx.fillRect(125, 1, 62, 20);
+  cx.fillStyle = '#069';
+  cx.fillText('Browser', 2, 2);
+  cx.fillStyle = 'rgba(102,204,0,0.7)';
+  cx.fillText('Canvas fp', 4, 17);
   const hash = cv.toDataURL().split('').reduce((a,c) => ((a<<5)-a)+c.charCodeAt(0)|0, 0);
-  document.getElementById('fp-canvas').textContent = `0x${Math.abs(hash).toString(16).toUpperCase().padStart(8,'0')}`;
+  canvasHashStr = `0x${Math.abs(hash).toString(16).toUpperCase().padStart(8,'0')}`;
+  document.getElementById('fp-canvas').textContent = canvasHashStr;
 } catch(e) {
   document.getElementById('fp-canvas').textContent = 'blocked';
 }
 
-// Summary fp count
-let fpCount = 12;
-document.getElementById('sum-fp').textContent = fpCount + ' fields';
+// Ticker sync
+document.getElementById('tick-tz').textContent = tz;
+document.getElementById('tick-tz2').textContent = tz;
+document.getElementById('tick-plat').textContent = navigator.platform || '—';
+document.getElementById('tick-plat2').textContent = navigator.platform || '—';
+document.getElementById('tick-screen').textContent = `${screen.width}x${screen.height}`;
+document.getElementById('tick-screen2').textContent = `${screen.width}x${screen.height}`;
+document.getElementById('tick-cpu').textContent = navigator.hardwareConcurrency || '—';
+document.getElementById('tick-cpu2').textContent = navigator.hardwareConcurrency || '—';
+document.getElementById('tick-lang').textContent = navigator.language || '—';
+document.getElementById('tick-lang2').textContent = navigator.language || '—';
+document.getElementById('tick-canvas').textContent = canvasHashStr;
+document.getElementById('tick-canvas2').textContent = canvasHashStr;
 
-// Uniqueness estimate (rough heuristic)
+// Summary
+document.getElementById('sum-fp').textContent = '12 vectors';
 const uBits = (navigator.hardwareConcurrency ? 3 : 0)
-            + (navigator.deviceMemory ? 2 : 0)
-            + 4  // screen
-            + 3  // lang+platform
-            + 2; // canvas
-document.getElementById('sum-unique').textContent = `~1 in ${Math.pow(2, uBits).toLocaleString()} users`;
+            + (navigator.deviceMemory ? 2 : 0) + 4 + 3 + 2;
+document.getElementById('sum-unique').textContent = `~1 in ${Math.pow(2, uBits).toLocaleString()}`;
+
+// Session fingerprint hash
+const fpRaw = `${screen.width}${screen.height}${navigator.platform}${navigator.language}${navigator.hardwareConcurrency}${canvasHashStr}`;
+const fpHash = fpRaw.split('').reduce((a,c) => ((a<<5)-a)+c.charCodeAt(0)|0, 0);
+document.getElementById('sum-fp-hash').textContent = `0x${Math.abs(fpHash).toString(16).toUpperCase().padStart(8,'0')}`;
 
 // IP lookup
 fetch('https://ipapi.co/json/')
   .then(r => r.json())
   .then(d => {
-    set('val-ip',  d.ip   || '—');
+    set('val-ip', d.ip || '—');
     set('val-loc', [d.city, d.region, d.country_name].filter(Boolean).join(', ') || '—');
-    set('val-isp', d.org  || '—');
+    set('val-isp', d.org || '—');
     set('val-cur', d.currency || '—');
     document.getElementById('val-ip').classList.add('ok');
+    document.getElementById('tick-ip').textContent = d.ip || '—';
+    document.getElementById('tick-ip2').textContent = d.ip || '—';
   })
   .catch(() => {
-    ['val-ip','val-loc','val-isp','val-cur'].forEach(id => set(id, 'failed to load'));
+    ['val-ip','val-loc','val-isp','val-cur'].forEach(id => set(id, 'FAILED'));
   });
 
 function set(id, val) {
@@ -627,7 +889,6 @@ function set(id, val) {
 }
 
 // ── PERMISSION HANDLERS ──
-
 let permsGranted = 0;
 
 function markStatus(id, state, label) {
@@ -647,121 +908,115 @@ function updatePermsCount() {
   document.getElementById('sum-perm').textContent = permsGranted;
 }
 
-// GPS
 function reqGPS() {
   document.getElementById('btn-gps').disabled = true;
-  markStatus('ps-gps', 'waiting', 'WAITING');
+  markStatus('ps-gps', 'waiting', 'SCANNING');
   navigator.geolocation.getCurrentPosition(
     p => {
-      markStatus('ps-gps', 'granted', 'GRANTED');
+      markStatus('ps-gps', 'granted', 'ACQUIRED');
       document.getElementById('pc-gps').classList.add('granted');
       showResult('pr-gps',
-        `Latitude:   ${p.coords.latitude.toFixed(6)}°<br>` +
-        `Longitude:  ${p.coords.longitude.toFixed(6)}°<br>` +
-        `Accuracy:   ±${Math.round(p.coords.accuracy)} m<br>` +
-        `Altitude:   ${p.coords.altitude != null ? p.coords.altitude.toFixed(1) + ' m' : 'not available'}<br>` +
-        `Speed:      ${p.coords.speed != null ? p.coords.speed.toFixed(1) + ' m/s' : 'not available'}`
+        `LAT    ${p.coords.latitude.toFixed(6)}<br>` +
+        `LNG    ${p.coords.longitude.toFixed(6)}<br>` +
+        `ACC    ±${Math.round(p.coords.accuracy)} m<br>` +
+        `ALT    ${p.coords.altitude != null ? p.coords.altitude.toFixed(1) + ' m' : 'N/A'}<br>` +
+        `SPD    ${p.coords.speed != null ? p.coords.speed.toFixed(1) + ' m/s' : 'N/A'}`
       );
       permsGranted++; updatePermsCount();
     },
     e => {
-      markStatus('ps-gps', 'denied', 'DENIED');
+      markStatus('ps-gps', 'denied', 'BLOCKED');
       document.getElementById('pc-gps').classList.add('denied');
-      showResult('pr-gps', `Error: ${e.message}`, true);
+      showResult('pr-gps', `ERR: ${e.message}`, true);
       document.getElementById('btn-gps').disabled = false;
     },
     { timeout: 10000, enableHighAccuracy: true }
   );
 }
 
-// Camera / Mic — enumerate devices only, no stream
 async function reqCamera() {
   document.getElementById('btn-cam').disabled = true;
-  markStatus('ps-cam', 'waiting', 'WAITING');
+  markStatus('ps-cam', 'waiting', 'SCANNING');
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
-    // Stop all tracks immediately — we only needed permission to enumerate
     stream.getTracks().forEach(t => t.stop());
     const devices = await navigator.mediaDevices.enumerateDevices();
-    markStatus('ps-cam', 'granted', 'GRANTED');
+    markStatus('ps-cam', 'granted', 'ACQUIRED');
     document.getElementById('pc-cam').classList.add('granted');
     const lines = devices.map(d =>
-      `${d.kind.padEnd(16)} ${d.label || '(no label)'} [${d.deviceId.slice(0,12)}…]`
+      `${d.kind.padEnd(16)} ${d.label || '(unlabeled)'} [${d.deviceId.slice(0,12)}...]`
     ).join('<br>');
-    showResult('pr-cam', lines || 'No devices found');
+    showResult('pr-cam', lines || 'NO DEVICES');
     permsGranted++; updatePermsCount();
   } catch(e) {
-    markStatus('ps-cam', 'denied', 'DENIED');
+    markStatus('ps-cam', 'denied', 'BLOCKED');
     document.getElementById('pc-cam').classList.add('denied');
-    showResult('pr-cam', `Error: ${e.message}`, true);
+    showResult('pr-cam', `ERR: ${e.message}`, true);
     document.getElementById('btn-cam').disabled = false;
   }
 }
 
-// Battery
 async function reqBattery() {
   document.getElementById('btn-bat').disabled = true;
-  markStatus('ps-bat', 'waiting', 'CHECKING');
+  markStatus('ps-bat', 'waiting', 'SCANNING');
   try {
-    if (!navigator.getBattery) throw new Error('Battery API not available in this browser');
+    if (!navigator.getBattery) throw new Error('Battery API unavailable');
     const b = await navigator.getBattery();
-    markStatus('ps-bat', 'granted', 'AVAILABLE');
+    markStatus('ps-bat', 'granted', 'ACQUIRED');
     document.getElementById('pc-bat').classList.add('granted');
     showResult('pr-bat',
-      `Level:     ${Math.round(b.level * 100)}%<br>` +
-      `Charging:  ${b.charging ? 'yes' : 'no'}<br>` +
-      `Time to full:    ${b.chargingTime === Infinity ? 'N/A' : b.chargingTime + 's'}<br>` +
-      `Time to empty:   ${b.dischargingTime === Infinity ? 'N/A' : b.dischargingTime + 's'}`
+      `LEVEL       ${Math.round(b.level * 100)}%<br>` +
+      `CHARGING    ${b.charging ? 'YES' : 'NO'}<br>` +
+      `TO_FULL     ${b.chargingTime === Infinity ? 'N/A' : b.chargingTime + 's'}<br>` +
+      `TO_EMPTY    ${b.dischargingTime === Infinity ? 'N/A' : b.dischargingTime + 's'}`
     );
     permsGranted++; updatePermsCount();
   } catch(e) {
     markStatus('ps-bat', 'denied', 'UNAVAILABLE');
-    showResult('pr-bat', `${e.message}`, true);
+    showResult('pr-bat', `ERR: ${e.message}`, true);
     document.getElementById('btn-bat').disabled = false;
   }
 }
 
-// Network
 function reqNetwork() {
   document.getElementById('btn-net').disabled = true;
-  markStatus('ps-net', 'waiting', 'CHECKING');
+  markStatus('ps-net', 'waiting', 'SCANNING');
   const c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
   if (!c) {
     markStatus('ps-net', 'denied', 'UNAVAILABLE');
-    showResult('pr-net', 'Network Information API not available in this browser (Firefox/Safari).', true);
+    showResult('pr-net', 'Network Information API not supported.', true);
     document.getElementById('btn-net').disabled = false;
     return;
   }
-  markStatus('ps-net', 'granted', 'AVAILABLE');
+  markStatus('ps-net', 'granted', 'ACQUIRED');
   document.getElementById('pc-net').classList.add('granted');
   showResult('pr-net',
-    `Type:          ${c.type || '—'}<br>` +
-    `Effective:     ${c.effectiveType || '—'}<br>` +
-    `Downlink:      ${c.downlink != null ? c.downlink + ' Mbps' : '—'}<br>` +
-    `RTT:           ${c.rtt != null ? c.rtt + ' ms' : '—'}<br>` +
-    `Save-data:     ${c.saveData ? 'on' : 'off'}`
+    `TYPE        ${c.type || '—'}<br>` +
+    `EFFECTIVE   ${c.effectiveType || '—'}<br>` +
+    `DOWNLINK    ${c.downlink != null ? c.downlink + ' Mbps' : '—'}<br>` +
+    `RTT         ${c.rtt != null ? c.rtt + ' ms' : '—'}<br>` +
+    `SAVEDATA    ${c.saveData ? 'ON' : 'OFF'}`
   );
   permsGranted++; updatePermsCount();
 }
 
-// Clipboard
 async function reqClipboard() {
   document.getElementById('btn-clip').disabled = true;
-  markStatus('ps-clip', 'waiting', 'WAITING');
+  markStatus('ps-clip', 'waiting', 'SCANNING');
   try {
     const text = await navigator.clipboard.readText();
-    markStatus('ps-clip', 'granted', 'GRANTED');
+    markStatus('ps-clip', 'granted', 'ACQUIRED');
     document.getElementById('pc-clip').classList.add('granted');
-    const preview = text.length > 200 ? text.slice(0, 200) + '…' : (text || '(clipboard is empty)');
+    const preview = text.length > 200 ? text.slice(0, 200) + '...' : (text || '(empty)');
     showResult('pr-clip',
-      `Content (${text.length} chars):<br><br>` +
+      `BYTES    ${text.length}<br><br>` +
       `"${preview.replace(/</g,'&lt;').replace(/>/g,'&gt;')}"`
     );
     permsGranted++; updatePermsCount();
   } catch(e) {
-    markStatus('ps-clip', 'denied', 'DENIED');
+    markStatus('ps-clip', 'denied', 'BLOCKED');
     document.getElementById('pc-clip').classList.add('denied');
-    showResult('pr-clip', `Error: ${e.message}`, true);
+    showResult('pr-clip', `ERR: ${e.message}`, true);
     document.getElementById('btn-clip').disabled = false;
   }
 }
